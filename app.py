@@ -3,13 +3,11 @@ from bs4 import BeautifulSoup
 import requests
 import plotly.graph_objects as go
 
-# Set the page configuration
 st.set_page_config(page_title="Cash Flow Analysis", page_icon="💰")
 
-# Title and description
 st.title("キャッシュフロー分析")
 
-# Toggle section for app explanation and usage instructions
+
 with st.expander("アプリの説明と使用方法"):
     st.write("""
         このアプリは、指定した企業のキャッシュフローを分析し、キャッシュフローのタイプを分類します。
@@ -23,10 +21,9 @@ with st.expander("アプリの説明と使用方法"):
         3. 分析結果が表示されます。
     """)
 
-# URL input
+# URL i
 url = st.text_input("企業のキャッシュフローURLを入力してください", "https://irbank.net/E05080/cf")
 
-# Execution button
 if st.button("実行"):
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
