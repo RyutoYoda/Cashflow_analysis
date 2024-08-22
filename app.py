@@ -43,11 +43,19 @@ if st.button("実行"):
         # データを辞書形式に変換
         data_with_labels = [dict(zip(labels, row)) for row in data]
 
-        # データ確認
-        periods = [entry['期間'] for entry in data_with_labels]
-        operating_cfs = [int(entry['営業CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
-        investing_cfs = [int(entry['投資CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
-        financing_cfs = [int(entry['財務CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
+        # データを確認するために表示
+        st.write("デバッグ情報: データの中身")
+        st.write(data_with_labels)
+
+        # 安全に期間ごとのデータを抽出するための処理
+        try:
+            periods = [entry.get('期間', '不明') for entry in data_with_labels]
+            operating_cfs = [int(entry.get('営業CF', '0').replace(',', '').replace('−', '-')) for entry in data_with_labels]
+            investing_cfs = [int(entry.get('投資CF', '0').replace(',', '').replace('−', '-')) for entry in data_with_labels]
+            financing_cfs = [int(entry.get('財務CF', '0').replace(',', '').replace('−', '-')) for entry in data_with_labels]
+        except Exception as e:
+            st.error(f"キャッシュフローデータの処理中にエラーが発生しました: {e}")
+            st.stop()
 
         # 折れ線グラフの作成
         fig = go.Figure()
@@ -70,9 +78,9 @@ if st.button("実行"):
 
         # キャッシュフローの分類関数
         def classify_cash_flow(entry):
-            operating_cf = int(entry['営業CF'].replace(',', '').replace('−', '-'))
-            investing_cf = int(entry['投資CF'].replace(',', '').replace('−', '-'))
-            financing_cf = int(entry['財務CF'].replace(',', '').replace('−', '-'))
+            operating_cf = int(entry.get('営業CF', '0').replace(',', '').replace('−', '-'))
+            investing_cf = int(entry.get('投資CF', '0').replace(',', '').replace('−', '-'))
+            financing_cf = int(entry.get('財務CF', '0').replace(',', '').replace('−', '-'))
 
             if operating_cf > 0 and investing_cf < 0 and financing_cf < 0:
                 return "優良企業", "営業CFが黒字、投資CFが赤字、財務CFが赤字。健全な事業運営を行っており、投資を積極的に行いつつ、借入金返済も進んでいる。長期的な安定成長が見込まれるため、低リスクの投資先と見なされる。"
@@ -94,14 +102,14 @@ if st.button("実行"):
                 return "分類不明", "データの形式が正しくないか、該当する分類がありません。"
 
         # 取得したデータに基づいて分類を実行
-        sorted_data = sorted(data_with_labels, key=lambda x: x['期間'], reverse=True)
+        sorted_data = sorted(data_with_labels, key=lambda x: x.get('期間', '不明'), reverse=True)
 
         for entry in sorted_data:
             classification, description = classify_cash_flow(entry)
             if entry == sorted_data[0]:
-                st.markdown(f"<h4 style='color:red;'>{entry['期間']} {entry['四半期']} => {classification}</h4>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='color:red;'>{entry.get('期間', '不明')} {entry.get('四半期', '不明')} => {classification}</h4>", unsafe_allow_html=True)
             else:
-                st.write(f"{entry['期間']} {entry['四半期']} => {classification}")
+                st.write(f"{entry.get('期間', '不明')} {entry.get('四半期', '不明')} => {classification}")
             st.write(f"特徴: {description}")
             st.write("-------------------------------------------------")
 
