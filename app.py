@@ -14,6 +14,12 @@ soup = BeautifulSoup(response.content, 'html.parser')
 
 # テーブルからキャッシュフローのデータを抽出
 table = soup.find('table', class_='cs')
+
+# エラーチェック：テーブルが見つからない場合
+if table is None:
+    st.error("キャッシュフローのデータテーブルが見つかりませんでした。URLを確認してください。")
+    st.stop()
+
 rows = table.find_all('tr')
 
 # データを格納するリスト
@@ -21,17 +27,29 @@ data = []
 for row in rows[1:]:
     cols = row.find_all('td')
     cols = [ele.text.strip() for ele in cols]
-    data.append(cols)
+    if len(cols) == 8:  # 8列あることを確認
+        data.append(cols)
 
 # ラベルを定義
 labels = ['期間', '四半期', '営業CF', '投資CF', '財務CF', 'フリーCF', '設備投資', '現金等']
+
+# データを辞書形式に変換
 data_with_labels = [dict(zip(labels, row)) for row in data]
 
+# データが正しく取得されたか確認
+if len(data_with_labels) == 0:
+    st.error("データの解析に失敗しました。ページ構造が変わった可能性があります。")
+    st.stop()
+
 # 期間ごとにCFデータを抽出
-periods = [entry['期間'] for entry in data_with_labels]
-operating_cfs = [int(entry['営業CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
-investing_cfs = [int(entry['投資CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
-financing_cfs = [int(entry['財務CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
+try:
+    periods = [entry['期間'] for entry in data_with_labels]
+    operating_cfs = [int(entry['営業CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
+    investing_cfs = [int(entry['投資CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
+    financing_cfs = [int(entry['財務CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
+except KeyError as e:
+    st.error(f"データ解析中にエラーが発生しました: {e}")
+    st.stop()
 
 # 折れ線グラフの作成 (Plotly)
 fig = go.Figure()
@@ -84,3 +102,4 @@ for entry in data_with_labels:
     st.write(f"{entry['期間']} {entry['四半期']} => **{classification}**")
     st.write(f"特徴: {description}")
     st.write("-------------------------------------------------")
+
