@@ -39,14 +39,23 @@ if st.button("実行"):
         cols = [ele.text.strip() for ele in cols]
         data.append(cols)
 
+    # デバッグ: 抽出されたデータを確認
+    st.write("Extracted Data:", data)
+
     # ラベルを定義
     labels = ['期間', '四半期', '営業CF', '投資CF', '財務CF', 'フリーCF', '設備投資', '現金等']
 
     # データを辞書形式に変換
     data_with_labels = [dict(zip(labels, row)) for row in data]
 
+    # デバッグ: 変換後のデータを確認
+    st.write("Data with Labels:", data_with_labels)
+
     # 最新の期間のデータを赤で表示
-    latest_period = data_with_labels[-1]['期間']
+    try:
+        latest_period = data_with_labels[-1]['期間']
+    except KeyError:
+        st.error("データが正しく抽出されていないため、'期間'を取得できませんでした。")
 
     # キャッシュフローの分類関数
     def classify_cash_flow(entry):
@@ -74,30 +83,33 @@ if st.button("実行"):
             return "分類不明", "データの形式が正しくないか、該当する分類がありません。"
 
     # 取得したデータに基づいて分類を実行し、降順で表示
-    data_with_labels.sort(key=lambda x: x['期間'], reverse=True)
-    for entry in data_with_labels:
-        classification, description = classify_cash_flow(entry)
-        if entry['期間'] == latest_period:
-            st.markdown(f"<span style='color:red;'>{entry['期間']} {entry['四半期']} => {classification}</span>", unsafe_allow_html=True)
-        else:
-            st.write(f"{entry['期間']} {entry['四半期']} => {classification}")
-        st.write(f"特徴: {description}")
-        st.write("-------------------------------------------------")
+    if data_with_labels:
+        data_with_labels.sort(key=lambda x: x['期間'], reverse=True)
+        for entry in data_with_labels:
+            classification, description = classify_cash_flow(entry)
+            if entry['期間'] == latest_period:
+                st.markdown(f"<span style='color:red;'>{entry['期間']} {entry['四半期']} => {classification}</span>", unsafe_allow_html=True)
+            else:
+                st.write(f"{entry['期間']} {entry['四半期']} => {classification}")
+            st.write(f"特徴: {description}")
+            st.write("-------------------------------------------------")
 
-    # 期間ごとにCFデータを抽出
-    periods = [entry['期間'] for entry in data_with_labels]
-    operating_cfs = [int(entry['営業CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
-    investing_cfs = [int(entry['投資CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
-    financing_cfs = [int(entry['財務CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
+        # 期間ごとにCFデータを抽出
+        periods = [entry['期間'] for entry in data_with_labels]
+        operating_cfs = [int(entry['営業CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
+        investing_cfs = [int(entry['投資CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
+        financing_cfs = [int(entry['財務CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
 
-    # 折れ線グラフの作成 (Plotly)
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=periods, y=operating_cfs, mode='lines+markers', name='営業CF', line=dict(color='blue')))
-    fig.add_trace(go.Scatter(x=periods, y=investing_cfs, mode='lines+markers', name='投資CF', line=dict(color='red')))
-    fig.add_trace(go.Scatter(x=periods, y=financing_cfs, mode='lines+markers', name='財務CF', line=dict(color='green')))
+        # 折れ線グラフの作成 (Plotly)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=periods, y=operating_cfs, mode='lines+markers', name='営業CF', line=dict(color='blue')))
+        fig.add_trace(go.Scatter(x=periods, y=investing_cfs, mode='lines+markers', name='投資CF', line=dict(color='red')))
+        fig.add_trace(go.Scatter(x=periods, y=financing_cfs, mode='lines+markers', name='財務CF', line=dict(color='green')))
 
-    # グラフの設定
-    fig.update_layout(title='キャッシュフローの推移', xaxis_title='期間', yaxis_title='キャッシュフロー (百万円)', xaxis_tickangle=-45)
+        # グラフの設定
+        fig.update_layout(title='キャッシュフローの推移', xaxis_title='期間', yaxis_title='キャッシュフロー (百万円)', xaxis_tickangle=-45)
 
-    # グラフの表示
-    st.plotly_chart(fig)
+        # グラフの表示
+        st.plotly_chart(fig)
+    else:
+        st.error("データがありません。正しいURLを入力してください。")
