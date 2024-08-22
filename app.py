@@ -118,7 +118,7 @@ if st.button("実行"):
     for entry in sorted_data:
         classification, description = classify_cash_flow(entry)
         if entry == sorted_data[0]:  # 最新の期間を赤字で表示
-            st.markdown(f"<span style='color:red'>[直近]{entry['期間']} {entry['四半期']} => **{classification}**</span>", unsafe_allow_html=True)
+            st.markdown(f"<span style='color:red'>[直近のデータ] {entry['期間']} {entry['四半期']} => **{classification}**</span>", unsafe_allow_html=True)
         else:
             st.write(f"{entry['期間']} {entry['四半期']} => **{classification}**")
         st.write(f"特徴: {description}")
