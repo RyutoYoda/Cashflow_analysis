@@ -120,6 +120,6 @@ if st.button("実行"):
         if entry == sorted_data[0]:  # 最新の期間を赤字で表示
             st.markdown(f"<span style='color:red'>{entry['期間']} {entry['四半期']} => **{classification}**</span>", unsafe_allow_html=True)
         else:
-            st.write(f"{entry['期間']} {entry['四半期']} => **{classification}**")
+            st.write(f"直近 {entry['期間']} {entry['四半期']} => **{classification}**")
         st.write(f"特徴: {description}")
         st.write("-------------------------------------------------")
