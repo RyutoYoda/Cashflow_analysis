@@ -95,11 +95,16 @@ def classify_cash_flow(entry):
     else:
         return "分類不明", "データの形式が正しくないか、該当する分類がありません。"
 
-# 取得したデータに基づいて分類を実行
+# 取得したデータを降順でソートして分類を実行
 st.write("### キャッシュフロー分類結果")
-for entry in data_with_labels:
+sorted_data = sorted(data_with_labels, key=lambda x: x['期間'], reverse=True)
+
+for entry in sorted_data:
     classification, description = classify_cash_flow(entry)
-    st.write(f"{entry['期間']} {entry['四半期']} => **{classification}**")
+    if entry == sorted_data[0]:  # 最新の期間を赤字で表示
+        st.markdown(f"<span style='color:red'>{entry['期間']} {entry['四半期']} => **{classification}**</span>", unsafe_allow_html=True)
+    else:
+        st.write(f"{entry['期間']} {entry['四半期']} => **{classification}**")
     st.write(f"特徴: {description}")
     st.write("-------------------------------------------------")
 
