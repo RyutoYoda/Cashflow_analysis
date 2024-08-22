@@ -24,7 +24,7 @@ with st.expander("アプリの説明と使用方法"):
 # URL i
 url = st.text_input("企業のキャッシュフローURLを入力してください", "https://irbank.net/E05080/cf")
 
-if st.button("実行"):
+if st.button("分析開始"):
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
 
