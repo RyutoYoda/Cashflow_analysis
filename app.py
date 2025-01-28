@@ -18,7 +18,7 @@ def generate_gpt_analysis(prompt, api_key):
     try:
         openai.api_key = api_key
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-3.5",
             messages=[{"role": "user", "content": prompt}]
         )
         return response.choices[0].message.content.strip()
