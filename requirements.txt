@@ -3,4 +3,4 @@ requests
 beautifulsoup4
 pandas
 plotly
-openai
+openai==0.28
