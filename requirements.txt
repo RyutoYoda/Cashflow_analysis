@@ -3,7 +3,4 @@ requests
 beautifulsoup4
 pandas
 plotly
-transformers
-torch
-accelerate
-bitsandbytes
+openai
