@@ -4,21 +4,14 @@ import requests
 import plotly.graph_objects as go
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextStreamer
 import torch
-from accelerate import init_empty_weights, infer_auto_device_map
-from transformers import BitsAndBytesConfig
 
 # Streamlit の設定
 st.set_page_config(page_title="Cash Flow Analysis", page_icon="💰")
 st.title("キャッシュフロー分析")
 
-# LLMモデルの設定
+# LLMモデルの設定 (量子化なし、CPU対応)
 model_name = "cyberagent/DeepSeek-R1-Distill-Qwen-32B-Japanese"
-bnb_config = BitsAndBytesConfig(load_in_8bit=True)  # 8ビット量子化
-
-with init_empty_weights():
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name, quantization_config=bnb_config, device_map="auto"
-    )
+model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.float32)
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
 
@@ -91,6 +84,7 @@ if st.button("分析開始"):
         st.write(f"期間: {entry['期間']} / 四半期: {entry['四半期']}")
         st.write(f"診断結果: {result}")
         st.write("-------------------------------------------------")
+
 
 # import streamlit as st
 # from bs4 import BeautifulSoup
