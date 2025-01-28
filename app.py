@@ -2,24 +2,37 @@ import streamlit as st
 from bs4 import BeautifulSoup
 import requests
 import plotly.graph_objects as go
-from transformers import AutoModelForCausalLM, AutoTokenizer, TextStreamer
-import torch
+import openai
 
 # Streamlit の設定
 st.set_page_config(page_title="Cash Flow Analysis", page_icon="💰")
 st.title("キャッシュフロー分析")
 
-# LLMモデルの設定 (量子化なし、CPU対応)
-model_name = "cyberagent/DeepSeek-R1-Distill-Qwen-32B-Japanese"
-model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.float32)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+# サイドバーでAPIキーを入力
+st.sidebar.title("設定")
+openai_api_key = st.sidebar.text_input("OpenAI APIキーを入力してください", type="password")
+
+# OpenAI APIの設定
+def generate_gpt_classification(prompt, api_key):
+    try:
+        openai.api_key = api_key
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"エラー: {e}"
 
 # URL入力
 url = st.text_input("企業のキャッシュフローURLを入力してください", "https://irbank.net/E05080/cf")
 
 # 分析実行
 if st.button("分析開始"):
+    if not openai_api_key:
+        st.error("OpenAI APIキーを入力してください。")
+        st.stop()
+
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -64,26 +77,24 @@ if st.button("分析開始"):
     )
     st.plotly_chart(fig)
 
-    # LLMで分類結果を生成
-    def generate_classification(entry):
+    # GPTで分類結果を生成
+    st.write("### キャッシュフロー分類結果")
+    sorted_data = sorted(data_with_labels, key=lambda x: x['期間'], reverse=True)
+
+    for entry in sorted_data:
         prompt = (
             f"以下は企業のキャッシュフロー情報です:\n"
+            f"期間: {entry['期間']} / 四半期: {entry['四半期']}\n"
             f"営業CF: {entry['営業CF']}\n"
             f"投資CF: {entry['投資CF']}\n"
             f"財務CF: {entry['財務CF']}\n"
-            f"この企業の健康状態を診断し、説明してください。"
+            f"この企業の健康状態を診断し、簡潔に説明してください。"
         )
-        input_ids = tokenizer(prompt, return_tensors="pt").to(model.device)
-        output = model.generate(input_ids, max_new_tokens=300, temperature=0.7)
-        return tokenizer.decode(output[0], skip_special_tokens=True)
-
-    sorted_data = sorted(data_with_labels, key=lambda x: x['期間'], reverse=True)
-    st.write("### キャッシュフロー分類結果")
-    for entry in sorted_data:
-        result = generate_classification(entry)
+        classification = generate_gpt_classification(prompt, openai_api_key)
         st.write(f"期間: {entry['期間']} / 四半期: {entry['四半期']}")
-        st.write(f"診断結果: {result}")
+        st.write(f"診断結果: {classification}")
         st.write("-------------------------------------------------")
+
 
 
 # import streamlit as st
