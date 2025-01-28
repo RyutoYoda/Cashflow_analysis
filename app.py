@@ -92,7 +92,7 @@ if st.button("分析開始"):
             f"営業CF: {entry['営業CF']}\n"
             f"投資CF: {entry['投資CF']}\n"
             f"財務CF: {entry['財務CF']}\n"
-            f"この企業の健康状態を診断し、また投資の観点からの意見も簡潔に述べてください。"
+            f"この企業の健康状態を診断し、その後投資の観点からの意見も簡潔に述べてください。"
         )
         analysis = generate_gpt_analysis(prompt, openai_api_key)
         st.write(f"期間: {entry['期間']} / 四半期: {entry['四半期']}")
