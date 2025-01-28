@@ -47,8 +47,17 @@ def fetch_stock_data_yf(ticker, period):
 url = st.text_input("企業のキャッシュフローURLを入力してください", "https://irbank.net/E05080/cf")
 stock_ticker = st.text_input("Yahoo Financeのティッカーシンボルを入力してください", "7203.T")  # 例: トヨタのティッカーシンボルは "7203.T"
 
+# ボタンの状態管理
+if "show_cashflow" not in st.session_state:
+    st.session_state.show_cashflow = False
+if "show_stock" not in st.session_state:
+    st.session_state.show_stock = False
+
 # キャッシュフロー診断
 if st.button("キャッシュフロー診断"):
+    st.session_state.show_cashflow = True  # ボタン状態を記録
+
+if st.session_state.show_cashflow:
     if not openai_api_key:
         st.error("OpenAI APIキーを入力してください。")
         st.stop()
@@ -88,9 +97,9 @@ if st.button("キャッシュフロー診断"):
 
     # キャッシュフローのグラフ
     fig_cf = go.Figure()
-    fig_cf.add_trace(go.Scatter(x=periods, y=operating_cfs, mode='lines+markers', name='営業CF', line=dict(color='blue')))
-    fig_cf.add_trace(go.Scatter(x=periods, y=investing_cfs, mode='lines+markers', name='投資CF', line=dict(color='red')))
-    fig_cf.add_trace(go.Scatter(x=periods, y=financing_cfs, mode='lines+markers', name='財務CF', line=dict(color='green')))
+    fig_cf.add_trace(go.Scatter(x=periods, y=operating_cfs, mode='lines', name='営業CF', line=dict(color='blue')))
+    fig_cf.add_trace(go.Scatter(x=periods, y=investing_cfs, mode='lines', name='投資CF', line=dict(color='red')))
+    fig_cf.add_trace(go.Scatter(x=periods, y=financing_cfs, mode='lines', name='財務CF', line=dict(color='green')))
 
     fig_cf.update_layout(
         title=f'{company_name} キャッシュフローの推移',
@@ -122,6 +131,9 @@ if st.button("キャッシュフロー診断"):
 
 # 株価インサイト
 if st.button("株価インサイト"):
+    st.session_state.show_stock = True  # ボタン状態を記録
+
+if st.session_state.show_stock:
     if not stock_ticker:
         st.error("ティッカーシンボルを入力してください。")
         st.stop()
@@ -129,12 +141,13 @@ if st.button("株価インサイト"):
     stock_data = fetch_stock_data_yf(stock_ticker, stock_period)
     if stock_data is not None:
         fig_stock = go.Figure()
-        fig_stock.add_trace(go.Scatter(x=stock_data["Date"], y=stock_data["Close"], mode='lines+markers', name='株価'))
+        fig_stock.add_trace(go.Scatter(x=stock_data["Date"], y=stock_data["Close"], mode='lines', name='株価'))
         fig_stock.update_layout(
-            title=f'{stock_ticker} 株価の推移',
+            title=f'{stock_ticker} 株価の推移 ({stock_period})',
             xaxis_title='日付',
             yaxis_title='株価 (JPY)',
-            template='plotly_white'
+            template='plotly_white',
+            xaxis_rangeslider_visible=True
         )
         st.plotly_chart(fig_stock)
     else:
