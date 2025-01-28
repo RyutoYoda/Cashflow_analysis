@@ -4,7 +4,7 @@ import requests
 import plotly.graph_objects as go
 import openai
 import pandas as pd
-from yahoo_fin import stock_info as si
+import yfinance as yf
 
 # Streamlit の設定
 st.set_page_config(page_title="Cash Flow and Stock Analysis", page_icon="📊")
@@ -26,14 +26,13 @@ def generate_gpt_analysis(prompt, api_key):
     except Exception as e:
         return f"エラー: {e}"
 
-# 株価データの取得 (Yahoo Finance)
-def fetch_stock_data_yahoo(ticker):
+# 株価データの取得 (yfinance)
+def fetch_stock_data_yf(ticker):
     try:
-        # Yahoo Financeから株価データを取得
-        historical_data = si.get_data(ticker, interval="1d")  # 1日の間隔でデータを取得
-        historical_data.reset_index(inplace=True)
-        historical_data.rename(columns={"adjclose": "close"}, inplace=True)
-        return historical_data[["date", "close"]]
+        # yfinanceで株価データを取得
+        stock_data = yf.download(ticker, period="6mo", interval="1d")  # 過去6ヶ月のデータを取得
+        stock_data.reset_index(inplace=True)
+        return stock_data[["Date", "Close"]]
     except Exception as e:
         st.error(f"Yahoo Financeからの株価データ取得中にエラーが発生しました: {e}")
         return None
@@ -98,10 +97,10 @@ if st.button("分析開始"):
     st.plotly_chart(fig_cf)
 
     # 株価データの取得と表示
-    stock_data = fetch_stock_data_yahoo(stock_ticker)
+    stock_data = fetch_stock_data_yf(stock_ticker)
     if stock_data is not None:
         fig_stock = go.Figure()
-        fig_stock.add_trace(go.Scatter(x=stock_data["date"], y=stock_data["close"], mode='lines+markers', name='株価'))
+        fig_stock.add_trace(go.Scatter(x=stock_data["Date"], y=stock_data["Close"], mode='lines+markers', name='株価'))
         fig_stock.update_layout(
             title=f'{company_name} 株価の推移',
             xaxis_title='日付',
@@ -123,12 +122,13 @@ if st.button("分析開始"):
             f"営業CF: {entry['営業CF']}\n"
             f"投資CF: {entry['投資CF']}\n"
             f"財務CF: {entry['財務CF']}\n"
-            f"この企業の健康状態を診断し、その後投資の観点からの意見も述べてください。"
+            f"この企業の健康状態を診断し、投資の観点からの意見を述べてください。"
         )
         analysis = generate_gpt_analysis(prompt, openai_api_key)
         st.write(f"期間: {entry['期間']} / 四半期: {entry['四半期']}")
         st.write(f"診断結果: {analysis}")
         st.write("-------------------------------------------------")
+
 
 
 # import streamlit as st
