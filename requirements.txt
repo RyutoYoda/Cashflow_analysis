@@ -4,4 +4,4 @@ beautifulsoup4
 pandas
 plotly
 openai==0.28
-yahoo_fin
+yfinance
