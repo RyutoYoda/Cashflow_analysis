@@ -38,7 +38,7 @@ def fetch_stock_data_yf(ticker, period):
     try:
         stock_data = yf.download(ticker, period=period, interval="1d")
         stock_data.reset_index(inplace=True)
-        return stock_data[["Date", "Close"]]
+        return stock_data[["Date", "Open", "High", "Low", "Close"]]
     except Exception as e:
         st.error(f"Yahoo Financeからの株価データ取得中にエラーが発生しました: {e}")
         return None
@@ -141,7 +141,24 @@ if st.session_state.show_stock:
     stock_data = fetch_stock_data_yf(stock_ticker, stock_period)
     if stock_data is not None:
         fig_stock = go.Figure()
-        fig_stock.add_trace(go.Scatter(x=stock_data["Date"], y=stock_data["Close"], mode='lines', name='株価'))
+
+        # ローソク足チャート
+        fig_stock.add_trace(go.Candlestick(
+            x=stock_data["Date"],
+            open=stock_data["Open"],
+            high=stock_data["High"],
+            low=stock_data["Low"],
+            close=stock_data["Close"],
+            name="株価"
+        ))
+
+        # 移動平均線を追加（7日移動平均）
+        stock_data["SMA_7"] = stock_data["Close"].rolling(window=7).mean()
+        fig_stock.add_trace(go.Scatter(
+            x=stock_data["Date"], y=stock_data["SMA_7"],
+            mode='lines', name="7日移動平均", line=dict(color='orange', width=2)
+        ))
+
         fig_stock.update_layout(
             title=f'{stock_ticker} 株価の推移 ({stock_period})',
             xaxis_title='日付',
