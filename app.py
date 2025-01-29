@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import openai
 import pandas as pd
 import yfinance as yf
+import re
 
 # Streamlit の設定
 st.set_page_config(page_title="Cash Flow and Stock Analysis", page_icon="📊")
@@ -44,14 +45,22 @@ def fetch_stock_data_yf(ticker, period):
         return None
 
 # URL入力とティッカーシンボル
-url = st.text_input("企業のキャッシュフローURLを入力してください", "https://irbank.net/E05080/cf")
-stock_ticker = st.text_input("Yahoo Financeのティッカーシンボルを入力してください", "7203.T")  # 例: トヨタのティッカーシンボルは "7203.T"
+url = st.text_input("企業のキャッシュフローURLを入力してください", "https://irbank.net/7203/cf")
+
+# IRBANKのURLから企業コードを自動取得
+default_stock_ticker = ""
+match = re.search(r"https://irbank.net/(\d+)/cf", url)
+if match:
+    default_stock_ticker = match.group(1) + ".T"  # 日本株は .T をつける
+
+# ティッカーシンボルを手動修正できるように
+stock_ticker = st.text_input("Yahoo Financeのティッカーシンボル", default_stock_ticker)
 
 # ボタンの状態管理
 if "show_cashflow" not in st.session_state:
     st.session_state.show_cashflow = False
 if "show_stock" not in st.session_state:
-    st.session_state.show_stock = False
+    st.session_state.show_stock = True  # 常に株価グラフは表示
 
 # キャッシュフロー診断
 if st.button("キャッシュフロー診断"):
@@ -111,28 +120,7 @@ if st.session_state.show_cashflow:
     )
     st.plotly_chart(fig_cf)
 
-    # GPT診断
-    st.write(f"### {company_name} の診断結果")
-    sorted_data = sorted(data_with_labels, key=lambda x: x['期間'], reverse=True)
-
-    for entry in sorted_data:
-        prompt = (
-            f"以下は {company_name} のキャッシュフロー情報です:\n"
-            f"期間: {entry['期間']} / 四半期: {entry['四半期']}\n"
-            f"営業CF: {entry['営業CF']}\n"
-            f"投資CF: {entry['投資CF']}\n"
-            f"財務CF: {entry['財務CF']}\n"
-            f"この企業の健康状態を診断し、投資の観点からの意見を述べてください。"
-        )
-        analysis = generate_gpt_analysis(prompt, openai_api_key)
-        st.write(f"期間: {entry['期間']} / 四半期: {entry['四半期']}")
-        st.write(f"診断結果: {analysis}")
-        st.write("-------------------------------------------------")
-
 # 株価インサイト
-if st.button("株価インサイト"):
-    st.session_state.show_stock = True  # ボタン状態を記録
-
 if st.session_state.show_stock:
     if not stock_ticker:
         st.error("ティッカーシンボルを入力してください。")
