@@ -57,16 +57,52 @@ if match:
 stock_ticker = st.text_input("Yahoo Financeのティッカーシンボル", default_stock_ticker)
 
 # ボタンの状態管理
-if "show_cashflow" not in st.session_state:
-    st.session_state.show_cashflow = False
 if "show_stock" not in st.session_state:
-    st.session_state.show_stock = True  # 常に株価グラフは表示
+    st.session_state.show_stock = False
+if "show_diagnosis" not in st.session_state:
+    st.session_state.show_diagnosis = False
 
-# キャッシュフロー診断
-if st.button("キャッシュフロー診断"):
-    st.session_state.show_cashflow = True  # ボタン状態を記録
+# 株価データ取得ボタン
+if st.button("📈 株価データを取得"):
+    st.session_state.show_stock = True
 
-if st.session_state.show_cashflow:
+# 株価グラフの表示
+if st.session_state.show_stock:
+    if not stock_ticker:
+        st.error("ティッカーシンボルを入力してください。")
+        st.stop()
+
+    stock_data = fetch_stock_data_yf(stock_ticker, stock_period)
+    if stock_data is not None:
+        fig_stock = go.Figure()
+
+        # ローソク足チャート
+        fig_stock.add_trace(go.Candlestick(
+            x=stock_data["Date"],
+            open=stock_data["Open"],
+            high=stock_data["High"],
+            low=stock_data["Low"],
+            close=stock_data["Close"],
+            name="株価"
+        ))
+
+        fig_stock.update_layout(
+            title=f'{stock_ticker} 株価の推移 ({stock_period})',
+            xaxis_title='日付',
+            yaxis_title='株価 (JPY)',
+            template='plotly_white',
+            xaxis_rangeslider_visible=True
+        )
+        st.plotly_chart(fig_stock)
+    else:
+        st.error("株価データの取得に失敗しました。")
+
+# 診断ボタン
+if st.session_state.show_stock and st.button("📝 診断を実行"):
+    st.session_state.show_diagnosis = True
+
+# キャッシュフロー診断の表示
+if st.session_state.show_diagnosis:
     if not openai_api_key:
         st.error("OpenAI APIキーを入力してください。")
         st.stop()
@@ -99,28 +135,7 @@ if st.session_state.show_cashflow:
         st.error("データの解析に失敗しました。")
         st.stop()
 
-    periods = [entry['期間'] for entry in data_with_labels]
-    operating_cfs = [int(entry['営業CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
-    investing_cfs = [int(entry['投資CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
-    financing_cfs = [int(entry['財務CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
-
-    # キャッシュフローのグラフ
-    fig_cf = go.Figure()
-    fig_cf.add_trace(go.Scatter(x=periods, y=operating_cfs, mode='lines', name='営業CF', line=dict(color='blue')))
-    fig_cf.add_trace(go.Scatter(x=periods, y=investing_cfs, mode='lines', name='投資CF', line=dict(color='red')))
-    fig_cf.add_trace(go.Scatter(x=periods, y=financing_cfs, mode='lines', name='財務CF', line=dict(color='green')))
-
-    fig_cf.update_layout(
-        title=f'{company_name} キャッシュフローの推移',
-        xaxis_title='期間',
-        yaxis_title='キャッシュフロー (百万円)',
-        xaxis=dict(tickangle=-45),
-        legend=dict(x=0, y=1),
-        template='plotly_white'
-    )
-    st.plotly_chart(fig_cf)
-
-    # GPT診断を復活
+    # GPT診断の実行
     st.write(f"### {company_name} の診断結果")
     sorted_data = sorted(data_with_labels, key=lambda x: x['期間'], reverse=True)
 
@@ -137,34 +152,3 @@ if st.session_state.show_cashflow:
         st.write(f"期間: {entry['期間']} / 四半期: {entry['四半期']}")
         st.write(f"診断結果: {analysis}")
         st.write("-------------------------------------------------")
-
-# 株価インサイト（キャッシュフロー実行後も常に表示）
-if st.session_state.show_stock:
-    if not stock_ticker:
-        st.error("ティッカーシンボルを入力してください。")
-        st.stop()
-
-    stock_data = fetch_stock_data_yf(stock_ticker, stock_period)
-    if stock_data is not None:
-        fig_stock = go.Figure()
-
-        # ローソク足チャート
-        fig_stock.add_trace(go.Candlestick(
-            x=stock_data["Date"],
-            open=stock_data["Open"],
-            high=stock_data["High"],
-            low=stock_data["Low"],
-            close=stock_data["Close"],
-            name="株価"
-        ))
-
-        fig_stock.update_layout(
-            title=f'{stock_ticker} 株価の推移 ({stock_period})',
-            xaxis_title='日付',
-            yaxis_title='株価 (JPY)',
-            template='plotly_white',
-            xaxis_rangeslider_visible=True
-        )
-        st.plotly_chart(fig_stock)
-    else:
-        st.error("株価データの取得に失敗しました。")
