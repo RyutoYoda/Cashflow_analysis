@@ -22,19 +22,54 @@ stock_period = st.sidebar.selectbox(
     index=2  # デフォルトは6ヶ月
 )
 
-# OpenAI APIの設定
-def generate_gpt_analysis(prompt, api_key):
+# **企業名から証券コードを取得する関数**
+def get_security_code(company_name, api_key):
+    prompt = f"日本の上場企業である {company_name} の証券コード（4桁の番号）を教えてください。番号のみを出力してください。"
     try:
         openai.api_key = api_key
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}]
         )
-        return response.choices[0].message.content.strip()
+        code = response.choices[0].message.content.strip()
+        if re.match(r"^\d{4}$", code):
+            return code
+        else:
+            return None
     except Exception as e:
-        return f"エラー: {e}"
+        return None
 
-# 株価データの取得 (yfinance)
+# **企業名を入力**
+company_name = st.text_input("企業名を入力してください（例：トヨタ自動車）")
+
+# **企業名から証券コードを取得**
+security_code = ""
+if company_name and openai_api_key:
+    security_code = get_security_code(company_name, openai_api_key)
+    if security_code:
+        st.success(f"{company_name} の証券コード: {security_code}")
+    else:
+        st.warning("証券コードの取得に失敗しました。手動で入力してください。")
+
+# 証券コードが取得できたら IRBANK と Yahoo Finance のデフォルト値を設定
+default_stock_ticker = f"{security_code}.T" if security_code else ""
+default_url = f"https://irbank.net/{security_code}/cf" if security_code else ""
+
+# **手動で証券コードを入力できるように**
+stock_ticker = st.text_input("Yahoo Financeのティッカーシンボル", default_stock_ticker)
+url = st.text_input("企業のキャッシュフローURLを入力してください", default_url)
+
+# ボタンの状態管理
+if "show_stock" not in st.session_state:
+    st.session_state.show_stock = False
+if "show_diagnosis" not in st.session_state:
+    st.session_state.show_diagnosis = False
+
+# **株価データ取得ボタン**
+if st.button("📈 株価データを取得"):
+    st.session_state.show_stock = True
+
+# **株価グラフの表示**
 def fetch_stock_data_yf(ticker, period):
     try:
         stock_data = yf.download(ticker, period=period, interval="1d")
@@ -45,29 +80,6 @@ def fetch_stock_data_yf(ticker, period):
         st.error(f"Yahoo Financeからの株価データ取得中にエラーが発生しました: {e}")
         return None
 
-# URL入力とティッカーシンボル
-url = st.text_input("企業のキャッシュフローURLを入力してください", "https://irbank.net/7203/cf")
-
-# IRBANKのURLから企業コードを自動取得
-default_stock_ticker = ""
-match = re.search(r"https://irbank.net/(\d+)/cf", url)
-if match:
-    default_stock_ticker = match.group(1) + ".T"  # 日本株は .T をつける
-
-# ティッカーシンボルを手動修正できるように
-stock_ticker = st.text_input("Yahoo Financeのティッカーシンボル", default_stock_ticker)
-
-# ボタンの状態管理
-if "show_stock" not in st.session_state:
-    st.session_state.show_stock = False
-if "show_diagnosis" not in st.session_state:
-    st.session_state.show_diagnosis = False
-
-# 株価データ取得ボタン
-if st.button("📈 株価データを取得"):
-    st.session_state.show_stock = True
-
-# 株価グラフの表示
 if st.session_state.show_stock:
     if not stock_ticker:
         st.error("ティッカーシンボルを入力してください。")
@@ -77,7 +89,7 @@ if st.session_state.show_stock:
     if stock_data is not None:
         fig_stock = go.Figure()
 
-        # ローソク足チャート
+        # **ローソク足チャート**
         fig_stock.add_trace(go.Candlestick(
             x=stock_data["Date"],
             open=stock_data["Open"],
@@ -87,7 +99,7 @@ if st.session_state.show_stock:
             name="株価"
         ))
 
-        # 7日移動平均線を追加
+        # **7日移動平均線を追加**
         fig_stock.add_trace(go.Scatter(
             x=stock_data["Date"], y=stock_data["SMA_7"],
             mode='lines', name="7日移動平均", line=dict(color='orange', width=2)
@@ -104,11 +116,11 @@ if st.session_state.show_stock:
     else:
         st.error("株価データの取得に失敗しました。")
 
-# 診断ボタン
+# **診断ボタン**
 if st.session_state.show_stock and st.button("📝 診断を実行"):
     st.session_state.show_diagnosis = True
 
-# キャッシュフロー診断の表示（グラフも復活）
+# **キャッシュフロー診断の表示（グラフも復活）**
 if st.session_state.show_diagnosis:
     if not openai_api_key:
         st.error("OpenAI APIキーを入力してください。")
@@ -117,11 +129,11 @@ if st.session_state.show_diagnosis:
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
 
-    # 企業名を取得
+    # **企業名を取得**
     company_name_tag = soup.find('title')
     company_name = company_name_tag.text.split(' | ')[0] if company_name_tag else "不明な企業"
 
-    # キャッシュフロー取得
+    # **キャッシュフロー取得**
     table = soup.find('table', class_='cs')
     if table is None:
         st.error("キャッシュフローのデータテーブルが見つかりませんでした。URLを確認してください。")
@@ -147,7 +159,7 @@ if st.session_state.show_diagnosis:
     investing_cfs = [int(entry['投資CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
     financing_cfs = [int(entry['財務CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
 
-    # **キャッシュフローのグラフを復活**
+    # **キャッシュフローのグラフ**
     fig_cf = go.Figure()
     fig_cf.add_trace(go.Scatter(x=periods, y=operating_cfs, mode='lines', name='営業CF', line=dict(color='blue')))
     fig_cf.add_trace(go.Scatter(x=periods, y=investing_cfs, mode='lines', name='投資CF', line=dict(color='red')))
@@ -157,26 +169,6 @@ if st.session_state.show_diagnosis:
         title=f'{company_name} キャッシュフローの推移',
         xaxis_title='期間',
         yaxis_title='キャッシュフロー (百万円)',
-        xaxis=dict(tickangle=-45),
-        legend=dict(x=0, y=1),
         template='plotly_white'
     )
     st.plotly_chart(fig_cf)
-
-    # GPT診断の実行
-    st.write(f"### {company_name} の診断結果")
-    sorted_data = sorted(data_with_labels, key=lambda x: x['期間'], reverse=True)
-
-    for entry in sorted_data:
-        prompt = (
-            f"以下は {company_name} のキャッシュフロー情報です:\n"
-            f"期間: {entry['期間']} / 四半期: {entry['四半期']}\n"
-            f"営業CF: {entry['営業CF']}\n"
-            f"投資CF: {entry['投資CF']}\n"
-            f"財務CF: {entry['財務CF']}\n"
-            f"この企業の健康状態を診断し、その後投資の観点からの意見も簡潔に述べてください。"
-        )
-        analysis = generate_gpt_analysis(prompt, openai_api_key)
-        st.write(f"期間: {entry['期間']} / 四半期: {entry['四半期']}")
-        st.write(f"診断結果: {analysis}")
-        st.write("-------------------------------------------------")
