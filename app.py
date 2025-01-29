@@ -161,16 +161,12 @@ if st.session_state.show_diagnosis and security_code:
         st.error("データの解析に失敗しました。")
         st.stop()
 
-    # **キャッシュフローのグラフ**
-    fig_cf = go.Figure()
-    fig_cf.add_trace(go.Scatter(x=[entry['期間'] for entry in data_with_labels], 
-                                y=[int(entry['営業CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels], 
-                                mode='lines', name='営業CF', line=dict(color='blue')))
-    fig_cf.add_trace(go.Scatter(x=[entry['期間'] for entry in data_with_labels], 
-                                y=[int(entry['投資CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels], 
-                                mode='lines', name='投資CF', line=dict(color='red')))
-    fig_cf.add_trace(go.Scatter(x=[entry['期間'] for entry in data_with_labels], 
-                                y=[int(entry['財務CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels], 
-                                mode='lines', name='財務CF', line=dict(color='green')))
-
-    st.plotly_chart(fig_cf)
+    # **GPT診断の実行**
+    st.write(f"### {company_name_fetched} の診断結果")
+    prompt = (
+        f"以下は {company_name_fetched} のキャッシュフロー情報です:\n"
+        f"{data_with_labels}\n"
+        f"この企業の健康状態を診断し、その後投資の観点からの意見も簡潔述べてください。"
+    )
+    analysis = generate_gpt_analysis(prompt, openai_api_key)
+    st.write(f"診断結果: {analysis}")
