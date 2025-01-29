@@ -8,7 +8,7 @@ import yfinance as yf
 import re
 
 # Streamlit の設定
-st.set_page_config(page_title="Cash Flow and Stock Analysis", page_icon="📊")
+st.set_page_config(page_title="Cash Flow and Stock Analysis", page_icon="💰")
 st.title("日経企業金融AI分析")
 
 # サイドバーで設定
@@ -161,20 +161,17 @@ if st.session_state.show_diagnosis and security_code:
         st.error("データの解析に失敗しました。")
         st.stop()
 
+    # **キャッシュフローのグラフ**
+    fig_cf = go.Figure()
+    fig_cf.add_trace(go.Scatter(x=[entry['期間'] for entry in data_with_labels], 
+                                y=[int(entry['営業CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels], 
+                                mode='lines', name='営業CF', line=dict(color='blue')))
+    fig_cf.update_layout(title=f'{company_name_fetched} キャッシュフローの推移')
+
+    st.plotly_chart(fig_cf)
+
     # **GPT診断の実行**
     st.write(f"### {company_name_fetched} の診断結果")
-    sorted_data = sorted(data_with_labels, key=lambda x: x['期間'], reverse=True)
-
-    for entry in sorted_data:
-        prompt = (
-            f"以下は {company_name_fetched} のキャッシュフロー情報です:\n"
-            f"期間: {entry['期間']} / 四半期: {entry['四半期']}\n"
-            f"営業CF: {entry['営業CF']}\n"
-            f"投資CF: {entry['投資CF']}\n"
-            f"財務CF: {entry['財務CF']}\n"
-            f"この企業の健康状態を診断し、投資の観点からの意見を述べてください。"
-        )
-        analysis = generate_gpt_analysis(prompt, openai_api_key)
-        st.write(f"期間: {entry['期間']} / 四半期: {entry['四半期']}")
-        st.write(f"診断結果: {analysis}")
-        st.write("-------------------------------------------------")
+    prompt = f"{company_name_fetched} のキャッシュフロー情報を診断し、投資の観点からの意見を述べてください。"
+    analysis = generate_gpt_analysis(prompt, openai_api_key)
+    st.write(f"診断結果: {analysis}")
