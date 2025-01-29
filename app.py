@@ -7,7 +7,9 @@ import pandas as pd
 import yfinance as yf
 import re
 
+# ------------------------------------------------------------
 # Streamlit の設定
+# ------------------------------------------------------------
 st.set_page_config(page_title="Cash Flow and Stock Analysis", page_icon="💰")
 st.title("日経企業金融AI分析")
 
@@ -19,72 +21,113 @@ openai_api_key = st.sidebar.text_input("OpenAI APIキーを入力してくださ
 stock_period = st.sidebar.selectbox(
     "株価データの期間を選択してください",
     options=["1mo", "6mo", "1y", "2y"],
-    index=2  # デフォルトは6ヶ月
+    index=2  # デフォルトは "1y"
 )
 
-# **GPTを使って企業名から証券コードを取得**
+# ------------------------------------------------------------
+# GPT を使って企業名から証券コードを取得する関数
+# ------------------------------------------------------------
 def get_security_code(company_name, api_key):
+    """
+    GPT-3.5-turboを使って、企業名から4桁の証券コードを取得する。
+    GPTの返答から4桁の数字を抽出し、最初に見つかった4桁を返す。
+    """
     if not api_key:
         return None
-    prompt = f"日本の上場企業である {company_name} の証券コード（4桁の番号）を教えてください。番号のみを出力してください。"
+    
+    # GPTへ尋ねるプロンプトを作成
+    prompt = (
+        f"あなたは日本の上場企業を調べるアシスタントです。"
+        f"日本の上場企業である「{company_name}」の証券コード（4桁の数字）だけを答えてください。"
+    )
+
     try:
         openai.api_key = api_key
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=50,
+            temperature=0
         )
-        code = response.choices[0].message.content.strip()
-        if re.match(r"^\d{4}$", code):
-            return code
+        # GPTからの返答
+        content = response.choices[0].message.content.strip()
+        
+        # 4桁の数字を正規表現で抽出
+        match = re.search(r"\b(\d{4})\b", content)
+        if match:
+            return match.group(1)
+        else:
+            return None
     except Exception as e:
         st.error(f"証券コード取得エラー: {e}")
-    return None
+        return None
 
-# **GPTを使ってキャッシュフロー診断を実行**
+# ------------------------------------------------------------
+# GPT を使ってキャッシュフロー診断を実行する関数
+# ------------------------------------------------------------
 def generate_gpt_analysis(prompt, api_key):
+    """
+    GPT-3.5-turboを使ってキャッシュフロー診断を実行する。
+    """
     if not api_key:
         return "エラー: APIキーが未入力です。"
     try:
         openai.api_key = api_key
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1000,
+            temperature=0.7
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
         return f"エラー: {e}"
 
-# **企業名入力**
+# ------------------------------------------------------------
+# 企業名の入力
+# ------------------------------------------------------------
 company_name = st.text_input("企業名を入力してください", "トヨタ自動車")
 
-# **証券コードの取得**
-security_code = get_security_code(company_name, openai_api_key) if company_name and openai_api_key else None
+# ------------------------------------------------------------
+# 証券コードの取得
+# ------------------------------------------------------------
+security_code = None
+if company_name and openai_api_key:
+    security_code = get_security_code(company_name, openai_api_key)
+elif not company_name:
+    st.warning("企業名を入力してください。")
+elif not openai_api_key:
+    st.warning("OpenAI APIキーを入力してください。")
 
-# **IRBANK の URL と Yahoo Finance のティッカーシンボルを自動設定**
+# ------------------------------------------------------------
+# IRBANK の URL と Yahoo Finance のティッカーシンボル設定
+# ------------------------------------------------------------
 url, stock_ticker = "", ""
 if security_code:
     url = f"https://irbank.net/{security_code}/cf"
     stock_ticker = f"{security_code}.T"  # 日本株は ".T" を付与
 
-# **URLとティッカーシンボルを表示**
-if security_code:
     st.write(f"**IRBANK URL:** [{url}]({url})")
     st.write(f"**Yahoo Finance ティッカー:** {stock_ticker}")
 else:
-    st.warning("証券コードが取得できませんでした。企業名を変更してみてください。")
+    if company_name and openai_api_key:
+        st.warning("証券コードが取得できませんでした。企業名を変更して再度お試しください。")
 
-# **ボタンの状態管理**
+# ------------------------------------------------------------
+# セッションステートの初期化
+# ------------------------------------------------------------
 if "show_stock" not in st.session_state:
-    st.session_state.show_stock = False
+    st.session_state["show_stock"] = False
 if "show_diagnosis" not in st.session_state:
-    st.session_state.show_diagnosis = False
+    st.session_state["show_diagnosis"] = False
 
-# **株価データ取得ボタン**
-if st.button("📈 株価データを取得") and stock_ticker:
-    st.session_state.show_stock = True
-
-# **株価データの取得**
+# ------------------------------------------------------------
+# 株価データ取得ボタン
+# ------------------------------------------------------------
 def fetch_stock_data_yf(ticker, period):
+    """
+    yfinanceを使って株価データを取得し、DataFrameを返す。
+    """
     try:
         stock_data = yf.download(ticker, period=period, interval="1d")
         stock_data.reset_index(inplace=True)
@@ -94,10 +137,18 @@ def fetch_stock_data_yf(ticker, period):
         st.error(f"Yahoo Financeからの株価データ取得中にエラーが発生しました: {e}")
         return None
 
-# **株価グラフの表示**
-if st.session_state.show_stock and stock_ticker:
+if st.button("📈 株価データを取得"):
+    if stock_ticker:
+        st.session_state["show_stock"] = True
+    else:
+        st.error("有効な証券コードがありません。")
+
+# ------------------------------------------------------------
+# 株価グラフの表示
+# ------------------------------------------------------------
+if st.session_state["show_stock"] and stock_ticker:
     stock_data = fetch_stock_data_yf(stock_ticker, stock_period)
-    if stock_data is not None:
+    if stock_data is not None and not stock_data.empty:
         fig_stock = go.Figure()
 
         # ローソク足チャート
@@ -125,54 +176,68 @@ if st.session_state.show_stock and stock_ticker:
         )
         st.plotly_chart(fig_stock)
     else:
-        st.error("株価データの取得に失敗しました。")
+        st.error("株価データの取得に失敗、またはデータが存在しませんでした。")
 
-# **診断ボタン**
-if st.session_state.show_stock and st.button("📝 診断を実行"):
-    st.session_state.show_diagnosis = True
+# ------------------------------------------------------------
+# 診断ボタン
+# ------------------------------------------------------------
+if st.session_state["show_stock"]:
+    if st.button("📝 診断を実行"):
+        st.session_state["show_diagnosis"] = True
 
-# **キャッシュフロー診断**
-if st.session_state.show_diagnosis and security_code:
-    response = requests.get(url)
+# ------------------------------------------------------------
+# キャッシュフロー診断
+# ------------------------------------------------------------
+if st.session_state["show_diagnosis"] and security_code:
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+    except Exception as e:
+        st.error(f"IRBANKページの取得に失敗しました: {e}")
+        st.stop()
+
     soup = BeautifulSoup(response.content, 'html.parser')
-
-    # **企業名を取得**
+    
+    # 企業名をIRBANKのtitleタグから取得
     company_name_tag = soup.find('title')
     company_name_fetched = company_name_tag.text.split(' | ')[0] if company_name_tag else company_name
 
-    # **キャッシュフロー取得**
+    # キャッシュフロー情報が含まれるテーブルを取得
     table = soup.find('table', class_='cs')
     if table is None:
         st.error("キャッシュフローのデータテーブルが見つかりませんでした。")
         st.stop()
 
     rows = table.find_all('tr')
+    if len(rows) < 2:
+        st.error("キャッシュフローのデータが存在しないようです。")
+        st.stop()
+
+    # 各列を想定通り抽出（IRBANK側で構造が変わる可能性があるので注意）
     data = []
     for row in rows[1:]:
         cols = row.find_all('td')
-        cols = [ele.text.strip() for ele in cols]
-        if len(cols) == 8:
-            data.append(cols)
+        # 列数は会社により変動があるかもしれないので最低限の検査のみ
+        # 今回は 8 列（期間, 四半期, 営業CF, 投資CF, 財務CF, フリーCF, 設備投資, 現金等）を想定
+        if len(cols) >= 8:
+            # 前半8列を取得
+            extracted = [c.text.strip() for c in cols[:8]]
+            data.append(extracted)
+
+    if not data:
+        st.error("キャッシュフローに関する必要な列が取得できませんでした。")
+        st.stop()
 
     labels = ['期間', '四半期', '営業CF', '投資CF', '財務CF', 'フリーCF', '設備投資', '現金等']
     data_with_labels = [dict(zip(labels, row)) for row in data]
 
-    if len(data_with_labels) == 0:
-        st.error("データの解析に失敗しました。")
-        st.stop()
-
-    # **診断結果の表示**
+    # GPT診断の実行
     st.write(f"### {company_name_fetched} の診断結果")
-    for entry in sorted(data_with_labels, key=lambda x: x['期間'], reverse=True):
-        prompt = (
-            f"以下は {company_name_fetched} のキャッシュフロー情報です:\n"
-            f"期間: {entry['期間']} / 四半期: {entry['四半期']}\n"
-            f"営業CF: {entry['営業CF']}\n"
-            f"投資CF: {entry['投資CF']}\n"
-            f"財務CF: {entry['財務CF']}\n"
-            f"この企業の健康状態を診断し、投資の観点からの意見を述べてください。"
-        )
-        analysis = generate_gpt_analysis(prompt, openai_api_key)
-        st.write(f"期間: {entry['期間']} / 四半期: {entry['四半期']}")
-        st.write(f"診断結果: {analysis}")
-        st.write("-------------------------------------------------")
+    prompt = (
+        f"以下は {company_name_fetched} のキャッシュフロー情報です:\n"
+        f"{data_with_labels}\n"
+        f"この企業の健康状態をキャッシュフローや投資観点から総合的に分析し、"
+        f"わかりやすく説明してください。"
+    )
+    analysis = generate_gpt_analysis(prompt, openai_api_key)
+    st.write(f"診断結果:\n\n{analysis}")
