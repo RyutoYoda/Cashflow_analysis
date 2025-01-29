@@ -120,7 +120,25 @@ if st.session_state.show_cashflow:
     )
     st.plotly_chart(fig_cf)
 
-# 株価インサイト
+    # GPT診断を復活
+    st.write(f"### {company_name} の診断結果")
+    sorted_data = sorted(data_with_labels, key=lambda x: x['期間'], reverse=True)
+
+    for entry in sorted_data:
+        prompt = (
+            f"以下は {company_name} のキャッシュフロー情報です:\n"
+            f"期間: {entry['期間']} / 四半期: {entry['四半期']}\n"
+            f"営業CF: {entry['営業CF']}\n"
+            f"投資CF: {entry['投資CF']}\n"
+            f"財務CF: {entry['財務CF']}\n"
+            f"この企業の健康状態を診断し、投資の観点からの意見を述べてください。"
+        )
+        analysis = generate_gpt_analysis(prompt, openai_api_key)
+        st.write(f"期間: {entry['期間']} / 四半期: {entry['四半期']}")
+        st.write(f"診断結果: {analysis}")
+        st.write("-------------------------------------------------")
+
+# 株価インサイト（キャッシュフロー実行後も常に表示）
 if st.session_state.show_stock:
     if not stock_ticker:
         st.error("ティッカーシンボルを入力してください。")
@@ -138,13 +156,6 @@ if st.session_state.show_stock:
             low=stock_data["Low"],
             close=stock_data["Close"],
             name="株価"
-        ))
-
-        # 移動平均線を追加（7日移動平均）
-        stock_data["SMA_7"] = stock_data["Close"].rolling(window=7).mean()
-        fig_stock.add_trace(go.Scatter(
-            x=stock_data["Date"], y=stock_data["SMA_7"],
-            mode='lines', name="7日移動平均", line=dict(color='orange', width=2)
         ))
 
         fig_stock.update_layout(
