@@ -116,7 +116,7 @@ if st.button("📈 株価データを取得") and stock_ticker:
         st.plotly_chart(fig_stock)
 
 # **キャッシュフロー診断を実行**
-if st.button("📝 診断を実行") and security_code:
+if st.button("📝 キャッシュフローの診断を実行") and security_code:
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -162,6 +162,6 @@ if st.button("📝 診断を実行") and security_code:
 
     # **GPT診断**
     st.write(f"### {company_name_fetched} の診断結果")
-    prompt = f"{company_name_fetched} のキャッシュフロー情報を診断し、投資の観点からの意見を述べてください。"
+    prompt = f"{company_name_fetched} のキャッシュフロー情報を診断し、その後投資の観点からの意見も簡潔に述べてください。"
     analysis = generate_gpt_analysis(prompt, openai_api_key)
     st.write(f"診断結果: {analysis}")
