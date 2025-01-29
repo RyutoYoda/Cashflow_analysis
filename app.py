@@ -108,7 +108,7 @@ if st.session_state.show_stock:
 if st.session_state.show_stock and st.button("📝 診断を実行"):
     st.session_state.show_diagnosis = True
 
-# キャッシュフロー診断の表示
+# キャッシュフロー診断の表示（グラフも復活）
 if st.session_state.show_diagnosis:
     if not openai_api_key:
         st.error("OpenAI APIキーを入力してください。")
@@ -141,6 +141,27 @@ if st.session_state.show_diagnosis:
     if len(data_with_labels) == 0:
         st.error("データの解析に失敗しました。")
         st.stop()
+
+    periods = [entry['期間'] for entry in data_with_labels]
+    operating_cfs = [int(entry['営業CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
+    investing_cfs = [int(entry['投資CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
+    financing_cfs = [int(entry['財務CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels]
+
+    # **キャッシュフローのグラフを復活**
+    fig_cf = go.Figure()
+    fig_cf.add_trace(go.Scatter(x=periods, y=operating_cfs, mode='lines', name='営業CF', line=dict(color='blue')))
+    fig_cf.add_trace(go.Scatter(x=periods, y=investing_cfs, mode='lines', name='投資CF', line=dict(color='red')))
+    fig_cf.add_trace(go.Scatter(x=periods, y=financing_cfs, mode='lines', name='財務CF', line=dict(color='green')))
+
+    fig_cf.update_layout(
+        title=f'{company_name} キャッシュフローの推移',
+        xaxis_title='期間',
+        yaxis_title='キャッシュフロー (百万円)',
+        xaxis=dict(tickangle=-45),
+        legend=dict(x=0, y=1),
+        template='plotly_white'
+    )
+    st.plotly_chart(fig_cf)
 
     # GPT診断の実行
     st.write(f"### {company_name} の診断結果")
