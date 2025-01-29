@@ -8,8 +8,8 @@ import yfinance as yf
 import re
 
 # Streamlit の設定
-st.set_page_config(page_title="Cash Flow and Stock Analysis", page_icon="📊")
-st.title("キャッシュフローと株価分析")
+st.set_page_config(page_title="Cash Flow and Stock Analysis", page_icon="💰")
+st.title("日経企業金融AI分析")
 
 # サイドバーで設定
 st.sidebar.title("設定")
@@ -18,7 +18,7 @@ openai_api_key = st.sidebar.text_input("OpenAI APIキーを入力してくださ
 # 株価データの期間選択
 stock_period = st.sidebar.selectbox(
     "株価データの期間を選択してください",
-    options=["1wk", "1mo", "6mo", "1y", "2y"],
+    options=["1mo", "6mo", "1y", "2y"],
     index=2  # デフォルトは6ヶ月
 )
 
@@ -174,7 +174,7 @@ if st.session_state.show_diagnosis:
             f"営業CF: {entry['営業CF']}\n"
             f"投資CF: {entry['投資CF']}\n"
             f"財務CF: {entry['財務CF']}\n"
-            f"この企業の健康状態を診断し、投資の観点からの意見を述べてください。"
+            f"この企業の健康状態を診断し、その後投資の観点からの意見も簡潔に述べてください。"
         )
         analysis = generate_gpt_analysis(prompt, openai_api_key)
         st.write(f"期間: {entry['期間']} / 四半期: {entry['四半期']}")
