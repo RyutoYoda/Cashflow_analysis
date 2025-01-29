@@ -41,9 +41,18 @@ def get_security_code(company_name, api_key):
     return None
 
 # **GPTを使ってキャッシュフロー診断を実行**
-def generate_gpt_analysis(prompt, api_key):
+def generate_gpt_analysis(company_name, financial_data, api_key):
     if not api_key:
         return "エラー: APIキーが未入力です。"
+    
+    prompt = (
+        f"{company_name} の最新のキャッシュフロー情報:\n"
+        f"営業CF: {financial_data['営業CF']}百万円\n"
+        f"投資CF: {financial_data['投資CF']}百万円\n"
+        f"財務CF: {financial_data['財務CF']}百万円\n"
+        f"このデータをもとに、この企業の健康状態を診断し、投資の観点からの意見を述べてください。"
+    )
+
     try:
         openai.api_key = api_key
         response = openai.ChatCompletion.create(
@@ -147,26 +156,15 @@ if st.session_state.show_diagnosis and security_code:
         st.stop()
 
     rows = table.find_all('tr')
-    data = []
-    for row in rows[1:]:
-        cols = row.find_all('td')
-        cols = [ele.text.strip() for ele in cols]
-        if len(cols) == 8:
-            data.append(cols)
-
-    labels = ['期間', '四半期', '営業CF', '投資CF', '財務CF', 'フリーCF', '設備投資', '現金等']
-    data_with_labels = [dict(zip(labels, row)) for row in data]
-
-    if len(data_with_labels) == 0:
-        st.error("データの解析に失敗しました。")
-        st.stop()
-
-    # **GPT診断の実行**
-    st.write(f"### {company_name_fetched} の診断結果")
-    prompt = (
-        f"以下は {company_name_fetched} のキャッシュフロー情報です:\n"
-        f"{data_with_labels}\n"
-        f"この企業の健康状態を診断し、その後投資の観点からの意見も簡潔述べてください。"
-    )
-    analysis = generate_gpt_analysis(prompt, openai_api_key)
-    st.write(f"診断結果: {analysis}")
+    latest_data = rows[1].find_all('td') if len(rows) > 1 else None
+    if latest_data:
+        financial_data = {
+            "営業CF": latest_data[2].text.replace(',', '').replace('−', '-'),
+            "投資CF": latest_data[3].text.replace(',', '').replace('−', '-'),
+            "財務CF": latest_data[4].text.replace(',', '').replace('−', '-'),
+        }
+        diagnosis = generate_gpt_analysis(company_name_fetched, financial_data, openai_api_key)
+        st.write(f"### {company_name_fetched} の診断結果")
+        st.write(diagnosis)
+    else:
+        st.error("最新のキャッシュフローデータが取得できませんでした。")
