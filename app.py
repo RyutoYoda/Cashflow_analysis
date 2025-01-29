@@ -39,7 +39,8 @@ def fetch_stock_data_yf(ticker, period):
     try:
         stock_data = yf.download(ticker, period=period, interval="1d")
         stock_data.reset_index(inplace=True)
-        return stock_data[["Date", "Open", "High", "Low", "Close"]]
+        stock_data["SMA_7"] = stock_data["Close"].rolling(window=7).mean()  # 7日移動平均
+        return stock_data[["Date", "Open", "High", "Low", "Close", "SMA_7"]]
     except Exception as e:
         st.error(f"Yahoo Financeからの株価データ取得中にエラーが発生しました: {e}")
         return None
@@ -84,6 +85,12 @@ if st.session_state.show_stock:
             low=stock_data["Low"],
             close=stock_data["Close"],
             name="株価"
+        ))
+
+        # 7日移動平均線を追加
+        fig_stock.add_trace(go.Scatter(
+            x=stock_data["Date"], y=stock_data["SMA_7"],
+            mode='lines', name="7日移動平均", line=dict(color='orange', width=2)
         ))
 
         fig_stock.update_layout(
