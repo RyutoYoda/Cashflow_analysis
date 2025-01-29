@@ -161,12 +161,18 @@ if st.session_state.show_diagnosis and security_code:
         st.error("データの解析に失敗しました。")
         st.stop()
 
-    # **GPT診断の実行**
+    # **診断結果の表示**
     st.write(f"### {company_name_fetched} の診断結果")
-    prompt = (
-        f"以下は {company_name_fetched} のキャッシュフロー情報です:\n"
-        f"{data_with_labels}\n"
-        f"この企業の健康状態を診断し、その後投資の観点からの意見も述べてください。"
-    )
-    analysis = generate_gpt_analysis(prompt, openai_api_key)
-    st.write(f"診断結果: {analysis}")
+    for entry in sorted(data_with_labels, key=lambda x: x['期間'], reverse=True):
+        prompt = (
+            f"以下は {company_name_fetched} のキャッシュフロー情報です:\n"
+            f"期間: {entry['期間']} / 四半期: {entry['四半期']}\n"
+            f"営業CF: {entry['営業CF']}\n"
+            f"投資CF: {entry['投資CF']}\n"
+            f"財務CF: {entry['財務CF']}\n"
+            f"この企業の健康状態を診断し、投資の観点からの意見を述べてください。"
+        )
+        analysis = generate_gpt_analysis(prompt, openai_api_key)
+        st.write(f"期間: {entry['期間']} / 四半期: {entry['四半期']}")
+        st.write(f"診断結果: {analysis}")
+        st.write("-------------------------------------------------")
