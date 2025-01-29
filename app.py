@@ -103,68 +103,47 @@ def fetch_stock_data_yf(ticker, period):
         st.error(f"Yahoo Financeからの株価データ取得中にエラーが発生しました: {e}")
         return None
 
-# **株価グラフの表示**
-if st.session_state.show_stock and stock_ticker:
-    stock_data = fetch_stock_data_yf(stock_ticker, stock_period)
-    if stock_data is not None:
-        fig_stock = go.Figure()
-
-        # ローソク足チャート
-        fig_stock.add_trace(go.Candlestick(
-            x=stock_data["Date"],
-            open=stock_data["Open"],
-            high=stock_data["High"],
-            low=stock_data["Low"],
-            close=stock_data["Close"],
-            name="株価"
-        ))
-
-        # 7日移動平均線
-        fig_stock.add_trace(go.Scatter(
-            x=stock_data["Date"], y=stock_data["SMA_7"],
-            mode='lines', name="7日移動平均", line=dict(color='orange', width=2)
-        ))
-
-        fig_stock.update_layout(
-            title=f'{stock_ticker} 株価の推移 ({stock_period})',
-            xaxis_title='日付',
-            yaxis_title='株価 (JPY)',
-            template='plotly_white',
-            xaxis_rangeslider_visible=True
-        )
-        st.plotly_chart(fig_stock)
-    else:
-        st.error("株価データの取得に失敗しました。")
-
-# **診断ボタン**
-if st.session_state.show_stock and st.button("📝 診断を実行"):
+# **キャッシュフロー診断**
+if st.button("📝 診断を実行") and url:
     st.session_state.show_diagnosis = True
 
-# **キャッシュフロー診断**
+# **キャッシュフローの取得と表示**
 if st.session_state.show_diagnosis and security_code:
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
 
-    # **企業名を取得**
-    company_name_tag = soup.find('title')
-    company_name_fetched = company_name_tag.text.split(' | ')[0] if company_name_tag else company_name
-
-    # **キャッシュフロー取得**
     table = soup.find('table', class_='cs')
     if table is None:
         st.error("キャッシュフローのデータテーブルが見つかりませんでした。")
         st.stop()
 
     rows = table.find_all('tr')
-    latest_data = rows[1].find_all('td') if len(rows) > 1 else None
-    if latest_data:
-        financial_data = {
-            "営業CF": latest_data[2].text.replace(',', '').replace('−', '-'),
-            "投資CF": latest_data[3].text.replace(',', '').replace('−', '-'),
-            "財務CF": latest_data[4].text.replace(',', '').replace('−', '-'),
-        }
-        diagnosis = generate_gpt_analysis(company_name_fetched, financial_data, openai_api_key)
-        st.write(f"### {company_name_fetched} の診断結果")
-        st.write(diagnosis)
-    else:
-        st.error("最新のキャッシュフローデータが取得できませんでした。")
+    data = []
+    for row in rows[1:]:
+        cols = row.find_all('td')
+        cols = [ele.text.strip() for ele in cols]
+        if len(cols) == 8:
+            data.append(cols)
+
+    labels = ['期間', '四半期', '営業CF', '投資CF', '財務CF', 'フリーCF', '設備投資', '現金等']
+    data_with_labels = [dict(zip(labels, row)) for row in data]
+
+    # **キャッシュフローのグラフ**
+    fig_cf = go.Figure()
+    fig_cf.add_trace(go.Scatter(x=[entry['期間'] for entry in data_with_labels], 
+                                y=[int(entry['営業CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels], 
+                                mode='lines', name='営業CF', line=dict(color='blue')))
+    fig_cf.add_trace(go.Scatter(x=[entry['期間'] for entry in data_with_labels], 
+                                y=[int(entry['投資CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels], 
+                                mode='lines', name='投資CF', line=dict(color='red')))
+    fig_cf.add_trace(go.Scatter(x=[entry['期間'] for entry in data_with_labels], 
+                                y=[int(entry['財務CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels], 
+                                mode='lines', name='財務CF', line=dict(color='green')))
+
+    st.plotly_chart(fig_cf)
+
+    # **GPT診断**
+    latest_data = data_with_labels[0]
+    diagnosis = generate_gpt_analysis(company_name, latest_data, openai_api_key)
+    st.write(f"### {company_name} の診断結果")
+    st.write(diagnosis)
