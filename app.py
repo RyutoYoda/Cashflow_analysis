@@ -54,6 +54,7 @@ if security_code:
     url = f"https://irbank.net/{security_code}/cf"
     st.success(f"取得した証券コード: {security_code} / Yahoo Finance ティッカー: {stock_ticker}")
 else:
+    # **証券コードが取得できなかった場合のみ、入力欄を表示**
     url = st.text_input("企業のキャッシュフローURLを入力してください", "https://irbank.net/7203/cf")
     stock_ticker = st.text_input("Yahoo Financeのティッカーシンボル", "")
 
