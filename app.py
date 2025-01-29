@@ -41,18 +41,9 @@ def get_security_code(company_name, api_key):
     return None
 
 # **GPTを使ってキャッシュフロー診断を実行**
-def generate_gpt_analysis(company_name, financial_data, api_key):
+def generate_gpt_analysis(prompt, api_key):
     if not api_key:
         return "エラー: APIキーが未入力です。"
-    
-    prompt = (
-        f"{company_name} の最新のキャッシュフロー情報:\n"
-        f"営業CF: {financial_data['営業CF']}百万円\n"
-        f"投資CF: {financial_data['投資CF']}百万円\n"
-        f"財務CF: {financial_data['財務CF']}百万円\n"
-        f"このデータをもとに、この企業の健康状態を診断し、投資の観点からの意見を述べてください。"
-    )
-
     try:
         openai.api_key = api_key
         response = openai.ChatCompletion.create(
@@ -103,15 +94,53 @@ def fetch_stock_data_yf(ticker, period):
         st.error(f"Yahoo Financeからの株価データ取得中にエラーが発生しました: {e}")
         return None
 
-# **キャッシュフロー診断**
-if st.button("📝 診断を実行") and url:
+# **株価グラフの表示**
+if st.session_state.show_stock and stock_ticker:
+    stock_data = fetch_stock_data_yf(stock_ticker, stock_period)
+    if stock_data is not None:
+        fig_stock = go.Figure()
+
+        # ローソク足チャート
+        fig_stock.add_trace(go.Candlestick(
+            x=stock_data["Date"],
+            open=stock_data["Open"],
+            high=stock_data["High"],
+            low=stock_data["Low"],
+            close=stock_data["Close"],
+            name="株価"
+        ))
+
+        # 7日移動平均線
+        fig_stock.add_trace(go.Scatter(
+            x=stock_data["Date"], y=stock_data["SMA_7"],
+            mode='lines', name="7日移動平均", line=dict(color='orange', width=2)
+        ))
+
+        fig_stock.update_layout(
+            title=f'{stock_ticker} 株価の推移 ({stock_period})',
+            xaxis_title='日付',
+            yaxis_title='株価 (JPY)',
+            template='plotly_white',
+            xaxis_rangeslider_visible=True
+        )
+        st.plotly_chart(fig_stock)
+    else:
+        st.error("株価データの取得に失敗しました。")
+
+# **診断ボタン**
+if st.session_state.show_stock and st.button("📝 診断を実行"):
     st.session_state.show_diagnosis = True
 
-# **キャッシュフローの取得と表示**
+# **キャッシュフロー診断**
 if st.session_state.show_diagnosis and security_code:
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
 
+    # **企業名を取得**
+    company_name_tag = soup.find('title')
+    company_name_fetched = company_name_tag.text.split(' | ')[0] if company_name_tag else company_name
+
+    # **キャッシュフロー取得**
     table = soup.find('table', class_='cs')
     if table is None:
         st.error("キャッシュフローのデータテーブルが見つかりませんでした。")
@@ -128,22 +157,16 @@ if st.session_state.show_diagnosis and security_code:
     labels = ['期間', '四半期', '営業CF', '投資CF', '財務CF', 'フリーCF', '設備投資', '現金等']
     data_with_labels = [dict(zip(labels, row)) for row in data]
 
-    # **キャッシュフローのグラフ**
-    fig_cf = go.Figure()
-    fig_cf.add_trace(go.Scatter(x=[entry['期間'] for entry in data_with_labels], 
-                                y=[int(entry['営業CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels], 
-                                mode='lines', name='営業CF', line=dict(color='blue')))
-    fig_cf.add_trace(go.Scatter(x=[entry['期間'] for entry in data_with_labels], 
-                                y=[int(entry['投資CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels], 
-                                mode='lines', name='投資CF', line=dict(color='red')))
-    fig_cf.add_trace(go.Scatter(x=[entry['期間'] for entry in data_with_labels], 
-                                y=[int(entry['財務CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels], 
-                                mode='lines', name='財務CF', line=dict(color='green')))
+    if len(data_with_labels) == 0:
+        st.error("データの解析に失敗しました。")
+        st.stop()
 
-    st.plotly_chart(fig_cf)
-
-    # **GPT診断**
-    latest_data = data_with_labels[0]
-    diagnosis = generate_gpt_analysis(company_name, latest_data, openai_api_key)
-    st.write(f"### {company_name} の診断結果")
-    st.write(diagnosis)
+    # **GPT診断の実行**
+    st.write(f"### {company_name_fetched} の診断結果")
+    prompt = (
+        f"以下は {company_name_fetched} のキャッシュフロー情報です:\n"
+        f"{data_with_labels}\n"
+        f"この企業の健康状態を診断し、その後投資の観点からの意見も述べてください。"
+    )
+    analysis = generate_gpt_analysis(prompt, openai_api_key)
+    st.write(f"診断結果: {analysis}")
