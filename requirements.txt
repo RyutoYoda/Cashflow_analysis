@@ -3,6 +3,6 @@ requests
 beautifulsoup4
 pandas
 plotly
-openai==0.28
 yfinance
 supabase
+groq
