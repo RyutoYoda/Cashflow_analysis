@@ -1,6 +1,4 @@
 import streamlit as st
-from bs4 import BeautifulSoup
-import requests
 import plotly.graph_objects as go
 import pandas as pd
 import yfinance as yf
@@ -74,13 +72,11 @@ with tab1:
 
     security_code = get_security_code(company_name) if company_name else None
 
-    url, stock_ticker = "", ""
+    stock_ticker = ""
     if security_code:
-        url = f"https://irbank.net/{security_code}/cf"
         stock_ticker = f"{security_code}.T"
 
     if security_code:
-        st.write(f"**IRBANK URL:** [{url}]({url})")
         st.write(f"**Yahoo Finance ティッカー:** {stock_ticker}")
     else:
         st.warning("証券コードが取得できませんでした。企業名を変更してみてください。")
@@ -88,7 +84,6 @@ with tab1:
     def fetch_stock_data_yf(ticker, period):
         try:
             stock_data = yf.download(ticker, period=period, interval="1d")
-            # MultiIndexカラムをフラットにする
             if isinstance(stock_data.columns, pd.MultiIndex):
                 stock_data.columns = stock_data.columns.get_level_values(0)
             stock_data.reset_index(inplace=True)
@@ -96,6 +91,37 @@ with tab1:
             return stock_data[["Date", "Open", "High", "Low", "Close", "SMA_7"]]
         except Exception as e:
             st.error(f"Yahoo Financeからの株価データ取得中にエラーが発生しました: {e}")
+            return None
+
+    def fetch_cashflow_yf(ticker):
+        """yfinanceからキャッシュフローデータを取得"""
+        try:
+            stock = yf.Ticker(ticker)
+            cf = stock.cashflow
+            if cf is None or cf.empty:
+                return None
+            # 行名を日本語にマッピング
+            row_map = {
+                "Operating Cash Flow": "営業CF",
+                "Investing Cash Flow": "投資CF",
+                "Financing Cash Flow": "財務CF",
+                "Free Cash Flow": "フリーCF",
+            }
+            result = {}
+            for eng, jpn in row_map.items():
+                if eng in cf.index:
+                    result[jpn] = cf.loc[eng]
+            if not result:
+                return None
+            df = pd.DataFrame(result)
+            df.index = pd.to_datetime(df.index)
+            df = df.sort_index()
+            df.index = df.index.strftime("%Y年%m月期")
+            # 百万円単位に変換
+            df = df / 1_000_000
+            return df
+        except Exception as e:
+            st.error(f"キャッシュフローデータの取得エラー: {e}")
             return None
 
     if st.button("📈 株価データを取得") and stock_ticker:
@@ -124,54 +150,46 @@ with tab1:
             st.plotly_chart(fig_stock)
 
     if st.button("📝 キャッシュフローの診断を実行") and security_code:
-        response = requests.get(url)
-        soup = BeautifulSoup(response.content, 'html.parser')
+        cf_df = fetch_cashflow_yf(stock_ticker)
 
-        company_name_tag = soup.find('title')
-        company_name_fetched = company_name_tag.text.split(' | ')[0] if company_name_tag else company_name
-
-        table = soup.find('table', class_='cs')
-        if table is None:
-            st.error("キャッシュフローのデータテーブルが見つかりませんでした。")
+        if cf_df is None:
+            st.error("キャッシュフローデータを取得できませんでした。")
             st.stop()
 
-        rows = table.find_all('tr')
-        data = []
-        for row in rows[1:]:
-            cols = row.find_all('td')
-            cols = [ele.text.strip() for ele in cols]
-            if len(cols) == 8:
-                data.append(cols)
-
-        labels = ['期間', '四半期', '営業CF', '投資CF', '財務CF', 'フリーCF', '設備投資', '現金等']
-        data_with_labels = [dict(zip(labels, row)) for row in data]
-
-        if len(data_with_labels) == 0:
-            st.error("データの解析に失敗しました。")
-            st.stop()
-
+        # キャッシュフローのグラフ
         fig_cf = go.Figure()
-        fig_cf.add_trace(go.Scatter(x=[entry['期間'] for entry in data_with_labels],
-                                    y=[int(entry['営業CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels],
-                                    mode='lines', name='営業CF', line=dict(color='blue')))
-        fig_cf.add_trace(go.Scatter(x=[entry['期間'] for entry in data_with_labels],
-                                    y=[int(entry['投資CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels],
-                                    mode='lines', name='投資CF', line=dict(color='red')))
-        fig_cf.add_trace(go.Scatter(x=[entry['期間'] for entry in data_with_labels],
-                                    y=[int(entry['財務CF'].replace(',', '').replace('−', '-')) for entry in data_with_labels],
-                                    mode='lines', name='財務CF', line=dict(color='green')))
-
-        fig_cf.update_layout(title=f'{company_name_fetched} キャッシュフローの推移')
+        colors = {"営業CF": "blue", "投資CF": "red", "財務CF": "green", "フリーCF": "purple"}
+        for col in cf_df.columns:
+            fig_cf.add_trace(go.Bar(
+                x=cf_df.index,
+                y=cf_df[col],
+                name=col,
+                marker_color=colors.get(col, "gray"),
+            ))
+        fig_cf.update_layout(
+            title=f'{company_name} キャッシュフローの推移（百万円）',
+            barmode='group',
+            template='plotly_white',
+        )
         st.plotly_chart(fig_cf)
 
-        st.write(f"### {company_name_fetched} の診断結果")
-        prompt = f"{company_name_fetched} のキャッシュフロー情報を診断し、その後投資の観点からの意見も簡潔に述べてください。"
+        # データテーブルも表示
+        st.dataframe(cf_df.style.format("{:,.0f}"), use_container_width=True)
+
+        # LLM診断
+        cf_summary = cf_df.to_string()
+        st.write(f"### {company_name} の診断結果")
+        prompt = f"""以下は {company_name}（証券コード: {security_code}）のキャッシュフローデータ（百万円）です。
+
+{cf_summary}
+
+このキャッシュフロー情報をもとに財務状況を診断し、投資の観点からの意見も簡潔に述べてください。"""
         analysis = generate_analysis(prompt)
-        st.write(f"診断結果: {analysis}")
+        st.write(analysis)
 
         # Supabaseに分析履歴を保存
         supabase.table("analysis_history").insert({
-            "company_name": company_name_fetched,
+            "company_name": company_name,
             "security_code": security_code,
             "analysis_result": analysis,
         }).execute()
