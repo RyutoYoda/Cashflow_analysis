@@ -22,7 +22,7 @@ MODEL = "llama-3.3-70b-versatile"
 
 # サイドバーで設定
 st.sidebar.title("設定")
-st.sidebar.info("本アプリはオープンソースLLM（Llama 3.3 70B）を使用しており、APIキーの入力は不要です。")
+st.sidebar.info("使用モデル: Llama 3.3 70B")
 
 # 株価データの期間選択
 stock_period = st.sidebar.selectbox(
