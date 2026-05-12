@@ -20,6 +20,17 @@ https://cashflowanalysis-deepseek.streamlit.app/
 
 ## 使用技術
 
+<p align="left">
+  <img src="https://img.shields.io/badge/Streamlit-FF4B4B?style=flat&logo=streamlit&logoColor=white" />
+  <img src="https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/Plotly-3F4F75?style=flat&logo=plotly&logoColor=white" />
+  <img src="https://img.shields.io/badge/Supabase-3FCF8E?style=flat&logo=supabase&logoColor=white" />
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white" />
+  <img src="https://img.shields.io/badge/Groq-000000?style=flat&logo=groq&logoColor=white" />
+  <img src="https://img.shields.io/badge/Llama_3.3-0467DF?style=flat&logo=meta&logoColor=white" />
+  <img src="https://img.shields.io/badge/Yahoo_Finance-720E9E?style=flat&logo=yahoo&logoColor=white" />
+</p>
+
 | 技術 | 用途 |
 |------|------|
 | Streamlit | Webアプリフレームワーク |
