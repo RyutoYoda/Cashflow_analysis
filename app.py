@@ -88,6 +88,9 @@ with tab1:
     def fetch_stock_data_yf(ticker, period):
         try:
             stock_data = yf.download(ticker, period=period, interval="1d")
+            # MultiIndexカラムをフラットにする
+            if isinstance(stock_data.columns, pd.MultiIndex):
+                stock_data.columns = stock_data.columns.get_level_values(0)
             stock_data.reset_index(inplace=True)
             stock_data["SMA_7"] = stock_data["Close"].rolling(window=7).mean()
             return stock_data[["Date", "Open", "High", "Low", "Close", "SMA_7"]]
