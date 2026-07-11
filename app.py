@@ -188,12 +188,15 @@ with tab1:
         st.write(analysis)
 
         # Supabaseに分析履歴を保存
-        supabase.table("analysis_history").insert({
-            "company_name": company_name,
-            "security_code": security_code,
-            "analysis_result": analysis,
-        }).execute()
-        st.success("分析結果を履歴に保存しました")
+        try:
+            supabase.table("analysis_history").insert({
+                "company_name": company_name,
+                "security_code": security_code,
+                "analysis_result": analysis,
+            }).execute()
+            st.success("分析結果を履歴に保存しました")
+        except Exception as e:
+            st.warning(f"履歴の保存に失敗しました（Supabase接続エラー）: {e}")
 
 # ============================================================
 # タブ2: 分析履歴
@@ -201,15 +204,23 @@ with tab1:
 with tab2:
     st.subheader("過去の分析履歴")
 
-    history = supabase.table("analysis_history").select("*").order("created_at", desc=True).execute()
+    try:
+        history = supabase.table("analysis_history").select("*").order("created_at", desc=True).execute()
+        history_data = history.data
+    except Exception as e:
+        st.warning(f"履歴の取得に失敗しました（Supabase接続エラー）: {e}")
+        history_data = None
 
-    if not history.data:
+    if not history_data:
         st.info("まだ分析履歴がありません。「企業分析」タブで診断を実行すると、ここに履歴が保存されます。")
     else:
-        st.caption(f"全 {len(history.data)} 件")
-        for record in history.data:
+        st.caption(f"全 {len(history_data)} 件")
+        for record in history_data:
             with st.expander(f"{record['company_name']}（{record['security_code']}）— {record['created_at'][:10]}"):
                 st.write(record["analysis_result"])
                 if st.button("削除", key=f"del_{record['id']}"):
-                    supabase.table("analysis_history").delete().eq("id", record["id"]).execute()
+                    try:
+                        supabase.table("analysis_history").delete().eq("id", record["id"]).execute()
+                    except Exception as e:
+                        st.warning(f"削除に失敗しました: {e}")
                     st.rerun()
